@@ -13,7 +13,7 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
   List<Pokemon> pokemonList = [];
   List<Pokemon> filteredPokemonList = [];
   final TextEditingController searchController = TextEditingController();
-  bool isSearchOpen = false; // Controla si el buscador está abierto
+  bool isSearchOpen = false;
 
   @override
   void initState() {
@@ -23,8 +23,9 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
   }
 
   Future<void> fetchPokemon() async {
+    print('Fetching Pokémon...');
     final response = await http.get(
-      Uri.parse('https://pokeapi.co/api/v2/pokemon?limit=50'),
+      Uri.parse('https://pokeapi.co/api/v2/pokemon?limit=1024'),
     );
 
     if (response.statusCode == 200) {
@@ -36,6 +37,7 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
         if (pokemonResponse.statusCode == 200) {
           final pokemonData = json.decode(pokemonResponse.body);
           loadedPokemon.add(Pokemon.fromJson(pokemonData));
+          print('Loaded ${pokemonData['name']}');
         }
       }
 
@@ -43,6 +45,9 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
         pokemonList = loadedPokemon;
         filteredPokemonList = List.from(pokemonList);
       });
+      print('Finished loading Pokémon.');
+    } else {
+      print('Failed to fetch Pokémon.');
     }
   }
 
