@@ -8,6 +8,7 @@ class Pokemon {
   final int attack;
   final int defense;
   final String type;
+  bool isFavorite = false;
 
   Pokemon({
     required this.name,
@@ -16,6 +17,7 @@ class Pokemon {
     required this.attack,
     required this.defense,
     required this.type,
+    this.isFavorite = false,
   });
 
   factory Pokemon.fromJson(Map<String, dynamic> json) {
