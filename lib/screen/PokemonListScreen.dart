@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
+import 'package:pokeapi/SP/favoritesmanager.dart';
+import 'package:pokeapi/main.dart';
 import 'package:pokeapi/pokemon.dart';
 import 'package:pokeapi/screen/PokemonDetailScreen.dart';
 import 'package:pokeapi/BBDD/PokemonDatabase.dart';
@@ -18,6 +21,7 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
   bool isSearchOpen = false;
   bool isDarkMode = false;
   bool isGridView = true;
+  bool isLoading = true;
 
   final PokemonDatabase _pokemonDatabase = PokemonDatabase.instance;
 
@@ -28,38 +32,67 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
     searchController.addListener(_filterPokemon);
   }
 
+  Future<void> _showFavoriteNotification(String pokemonName) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'favorite_pokemon_channel',
+          'Pokémon Favoritos',
+          channelDescription: 'Notifica cuando marcas un Pokémon como favorito',
+          importance: Importance.high,
+          priority: Priority.high,
+        );
+
+    const NotificationDetails notificationDetails = NotificationDetails(
+      android: androidDetails,
+    );
+
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      '¡Nuevo Favorito!',
+      '¡$pokemonName ahora es tu favorito!',
+      notificationDetails,
+    );
+  }
+
   Future<void> _loadPokemons() async {
-    print('Cargando Pokémon...');
+    debugPrint('Cargando Pokémon...');
 
     final List<Map<String, dynamic>> localPokemons =
         await _pokemonDatabase.fetchPokemonsFromDB();
 
     if (localPokemons.isNotEmpty) {
-      print('Pokémon cargados desde la base de datos local.');
+      debugPrint('Pokémon cargados desde la base de datos local.');
       setState(() {
         pokemonList =
             localPokemons
                 .map(
                   (pokemon) => Pokemon(
                     name: pokemon['name'],
-                    imageUrl: pokemon['imageUrl'],
-                    hp: pokemon['hp'],
-                    attack: pokemon['attack'],
-                    defense: pokemon['defense'],
-                    type: pokemon['type'],
+                    imageUrl:
+                        pokemon['sprites']['other']['official-artwork']['front_default'],
+                    hp: pokemon['stats'][0]['base_stat'],
+                    attack: pokemon['stats'][1]['base_stat'],
+                    defense: pokemon['stats'][2]['base_stat'],
+                    spAttack: pokemon['stats'][3]['base_stat'],
+                    spDefense: pokemon['stats'][4]['base_stat'],
+                    speed: pokemon['stats'][5]['base_stat'],
+                    weight: pokemon['weight'],
+                    height: pokemon['height'],
+                    type: pokemon['types'][0]['type']['name'],
                   ),
                 )
                 .toList();
+
         filteredPokemonList = List.from(pokemonList);
+        isLoading = false;
       });
     } else {
-      print(
+      debugPrint(
         'No hay Pokémon en la base de datos local. Cargando desde la API...',
       );
       await fetchPokemon();
     }
 
-    // Cargar favoritos
     await _loadFavorites();
   }
 
@@ -80,21 +113,26 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      List<Pokemon> loadedPokemon = [];
 
-      for (var item in data['results']) {
-        final pokemonResponse = await http.get(Uri.parse(item['url']));
-        if (pokemonResponse.statusCode == 200) {
-          final pokemonData = json.decode(pokemonResponse.body);
-          loadedPokemon.add(Pokemon.fromJson(pokemonData));
-          print('Loaded ${pokemonData['name']}');
-        }
-      }
+      List<Future<Pokemon>> futurePokemons =
+          data['results'].map<Future<Pokemon>>((item) async {
+            final pokemonResponse = await http.get(Uri.parse(item['url']));
+            if (pokemonResponse.statusCode == 200) {
+              final pokemonData = json.decode(pokemonResponse.body);
+              return Pokemon.fromJson(pokemonData);
+            } else {
+              throw Exception('Failed to fetch ${item['name']}');
+            }
+          }).toList();
+
+      List<Pokemon> loadedPokemon = await Future.wait(futurePokemons);
 
       setState(() {
         pokemonList = loadedPokemon;
         filteredPokemonList = List.from(pokemonList);
+        isLoading = false;
       });
+
       print('Finished loading Pokémon.');
     } else {
       print('Failed to fetch Pokémon.');
@@ -108,6 +146,10 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
 
     if (pokemon.isFavorite) {
       await FavoritesManager.addFavorite(pokemon.name);
+
+      Future.delayed(Duration(seconds: 3), () {
+        _showFavoriteNotification(pokemon.name);
+      });
     } else {
       await FavoritesManager.removeFavorite(pokemon.name);
     }
@@ -172,120 +214,112 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
                       : SizedBox(),
             ),
             Expanded(
-              child:
-                  filteredPokemonList.isEmpty
-                      ? Center(child: CircularProgressIndicator())
-                      : (isGridView
-                          ? GridView.builder(
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 8.0,
-                                  mainAxisSpacing: 8.0,
-                                ),
-                            itemCount: filteredPokemonList.length,
-                            itemBuilder: (context, index) {
-                              final pokemon = filteredPokemonList[index];
-                              return GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) => PokemonDetailScreen(
-                                            pokemon: pokemon,
-                                            index: index + 1,
-                                          ),
-                                    ),
-                                  );
-                                },
-                                child: Card(
-                                  color: Colors.redAccent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15.0),
+              child: AnimatedOpacity(
+                opacity: isLoading ? 0.0 : 1.0,
+                duration: Duration(milliseconds: 800),
+                child:
+                    filteredPokemonList.isEmpty
+                        ? Center(child: CircularProgressIndicator())
+                        : (isGridView
+                            ? GridView.builder(
+                              padding: EdgeInsets.all(10),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 10,
                                   ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Image.network(
-                                        pokemon.imageUrl,
-                                        height: 80,
-                                        width: 80,
-                                      ),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        pokemon.name.toUpperCase(),
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: Icon(
-                                          pokemon.isFavorite
-                                              ? Icons.favorite
-                                              : Icons.favorite_border,
-                                          color: Colors.white,
-                                        ),
-                                        onPressed: () {
-                                          _toggleFavorite(pokemon);
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          )
-                          : ListView.builder(
-                            itemCount: filteredPokemonList.length,
-                            itemBuilder: (context, index) {
-                              final pokemon = filteredPokemonList[index];
-                              return ListTile(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) => PokemonDetailScreen(
-                                            pokemon: pokemon,
-                                            index: index + 1,
-                                          ),
-                                    ),
-                                  );
-                                },
-                                leading: Image.network(
-                                  pokemon.imageUrl,
-                                  height: 50,
-                                  width: 50,
-                                ),
-                                title: Text(
-                                  pokemon.name.toUpperCase(),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                trailing: IconButton(
-                                  icon: Icon(
-                                    pokemon.isFavorite
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () {
-                                    _toggleFavorite(pokemon);
-                                  },
-                                ),
-                              );
-                            },
-                          )),
+                              itemCount: filteredPokemonList.length,
+                              itemBuilder: (context, index) {
+                                final pokemon = filteredPokemonList[index];
+                                return _buildPokemonCard(pokemon);
+                              },
+                            )
+                            : ListView.builder(
+                              itemCount: filteredPokemonList.length,
+                              itemBuilder: (context, index) {
+                                final pokemon = filteredPokemonList[index];
+                                return _buildPokemonCard(pokemon);
+                              },
+                            )),
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildPokemonCard(Pokemon pokemon) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => PokemonDetailScreen(
+                  pokemon: pokemon,
+                  index: pokemonList.indexOf(pokemon) + 1,
+                ),
+          ),
+        );
+      },
+      child: Card(
+        elevation: 5,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        child: ClipRRect(
+          // Evita el overflow en los bordes
+          borderRadius: BorderRadius.circular(15),
+          child: Column(
+            mainAxisSize:
+                MainAxisSize
+                    .min, // Evita que el contenido crezca más de lo necesario
+            children: [
+              Expanded(
+                child: Image.network(
+                  pokemon.imageUrl,
+                  height: 100,
+                  width: 100,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(
+                  8.0,
+                ), // Agrega espacio interno para evitar overflow
+                child: Text(
+                  pokemon.name.toUpperCase(),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  pokemon.isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: Colors.red,
+                ),
+                onPressed: () {
+                  _toggleFavorite(pokemon);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _filterPokemon() {
+    setState(() {
+      filteredPokemonList =
+          pokemonList
+              .where(
+                (pokemon) => pokemon.name.toLowerCase().contains(
+                  searchController.text.toLowerCase(),
+                ),
+              )
+              .toList();
+    });
   }
 
   @override

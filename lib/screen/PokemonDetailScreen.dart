@@ -7,8 +7,9 @@ class PokemonDetailScreen extends StatelessWidget {
 
   PokemonDetailScreen({required this.pokemon, required this.index});
 
+  /// Método para obtener el color según el tipo de Pokémon
   Color getTypeColor(String type) {
-    switch (type) {
+    switch (type.toLowerCase()) {
       case 'fire':
         return Colors.orange;
       case 'water':
@@ -17,6 +18,16 @@ class PokemonDetailScreen extends StatelessWidget {
         return Colors.green;
       case 'electric':
         return Colors.yellow;
+      case 'psychic':
+        return Colors.purple;
+      case 'rock':
+        return Colors.brown;
+      case 'ground':
+        return Colors.brown[400]!;
+      case 'flying':
+        return Colors.indigo;
+      case 'bug':
+        return Colors.lightGreen;
       default:
         return Colors.grey;
     }
@@ -25,54 +36,140 @@ class PokemonDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: getTypeColor(pokemon.type),
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text(pokemon.name.toUpperCase()),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Center(
+        title: Text("PokeDex"),
+        backgroundColor: getTypeColor(pokemon.type),
+      ), // Cambiado el color del AppBar
+      body: SingleChildScrollView(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Image.network(pokemon.imageUrl, height: 150, width: 150),
+            SizedBox(height: 20),
+            Container(
+              decoration: BoxDecoration(
+                color: getTypeColor(pokemon.type), // Cambiado el color de fondo
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(50),
+                  bottomRight: Radius.circular(50),
+                ),
+              ),
+              child: Column(
+                children: [
+                  SizedBox(height: 20),
+                  Image.network(pokemon.imageUrl, height: 150, width: 150),
+                  SizedBox(height: 10),
+                  Text(
+                    "#$index",
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    pokemon.name.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [_buildTypeChip(pokemon.type)],
+                  ),
+                  SizedBox(height: 20),
+                ],
+              ),
+            ),
             SizedBox(height: 20),
             Text(
-              '#$index',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+              "${pokemon.weight} KG   |   ${pokemon.height} M",
+              style: TextStyle(fontSize: 18, color: Colors.white70),
             ),
-            Text(
-              pokemon.name.toUpperCase(),
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            Text(
-              pokemon.type.toUpperCase(),
-              style: TextStyle(fontSize: 22, color: Colors.white70),
-            ),
-            SizedBox(height: 10),
-            Text(
-              'HP: ${pokemon.hp}',
-              style: TextStyle(fontSize: 18, color: Colors.white),
-            ),
-            Text(
-              'Attack: ${pokemon.attack}',
-              style: TextStyle(fontSize: 18, color: Colors.white),
-            ),
-            Text(
-              'Defense: ${pokemon.defense}',
-              style: TextStyle(fontSize: 18, color: Colors.white),
-            ),
+            SizedBox(height: 20),
+            _buildStats(),
           ],
         ),
       ),
+    );
+  }
+
+  /// Chip de tipo de Pokémon.
+  Widget _buildTypeChip(String type) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 5),
+      child: Chip(
+        label: Text(type.toUpperCase(), style: TextStyle(color: Colors.white)),
+        backgroundColor: getTypeColor(type),
+      ),
+    );
+  }
+
+  /// Tarjeta con estadísticas del Pokémon.
+  Widget _buildStats() {
+    return Padding(
+      padding: EdgeInsets.all(20),
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        color: Colors.black,
+        elevation: 5,
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildStatRow("HP", pokemon.hp, Colors.red),
+              _buildStatRow("ATK", pokemon.attack, Colors.orange),
+              _buildStatRow("DEF", pokemon.defense, Colors.blue),
+              _buildStatRow("SP ATK", pokemon.spAttack, Colors.purple),
+              _buildStatRow("SP DEF", pokemon.spDefense, Colors.green),
+              _buildStatRow("SPD", pokemon.speed, Colors.yellow),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, int value, Color color) {
+    double maxWidth = 200; // Ancho máximo de la barra de progreso
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: 5),
+        Stack(
+          children: [
+            Container(
+              height: 10,
+              width: maxWidth,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            Container(
+              height: 10,
+              width: (value / 270.0) * maxWidth, // Normalización
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 10),
+      ],
     );
   }
 }
