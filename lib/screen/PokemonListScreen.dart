@@ -5,6 +5,7 @@ import 'package:pokeapi/pokemon.dart';
 import 'package:pokeapi/screen/PokemonDetailScreen.dart';
 import 'package:pokeapi/BBDD/PokemonDatabase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pokeapi/manager/FavoritesManager.dart';
 
 class PokemonListScreen extends StatefulWidget {
   @override
@@ -32,7 +33,7 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
     print('Cargando Pokémon...');
 
     final List<Map<String, dynamic>> localPokemons =
-        await _pokemonDatabase.fetchPokemonsFromDB();
+    await _pokemonDatabase.fetchPokemonsFromDB();
 
     if (localPokemons.isNotEmpty) {
       print('Pokémon cargados desde la base de datos local.');
@@ -41,14 +42,14 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
             localPokemons
                 .map(
                   (pokemon) => Pokemon(
-                    name: pokemon['name'],
-                    imageUrl: pokemon['imageUrl'],
-                    hp: pokemon['hp'],
-                    attack: pokemon['attack'],
-                    defense: pokemon['defense'],
-                    type: pokemon['type'],
-                  ),
-                )
+                name: pokemon['name'],
+                imageUrl: pokemon['imageUrl'],
+                hp: pokemon['hp'],
+                attack: pokemon['attack'],
+                defense: pokemon['defense'],
+                type: pokemon['type'],
+              ),
+            )
                 .toList();
         filteredPokemonList = List.from(pokemonList);
       });
@@ -113,6 +114,16 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
     }
   }
 
+  void _filterPokemon() {
+    setState(() {
+      filteredPokemonList = pokemonList
+          .where((pokemon) => pokemon.name
+          .toLowerCase()
+          .contains(searchController.text.toLowerCase()))
+          .toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -155,132 +166,132 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
               height: isSearchOpen ? 60 : 0,
               padding: EdgeInsets.symmetric(horizontal: 10),
               child:
-                  isSearchOpen
-                      ? TextField(
-                        controller: searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Buscar Pokémon...',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          prefixIcon: Icon(Icons.search),
-                        ),
-                        onChanged: (value) {
-                          _filterPokemon();
-                        },
-                      )
-                      : SizedBox(),
+              isSearchOpen
+                  ? TextField(
+                controller: searchController,
+                decoration: InputDecoration(
+                  hintText: 'Buscar Pokémon...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  prefixIcon: Icon(Icons.search),
+                ),
+                onChanged: (value) {
+                  _filterPokemon();
+                },
+              )
+                  : SizedBox(),
             ),
             Expanded(
               child:
-                  filteredPokemonList.isEmpty
-                      ? Center(child: CircularProgressIndicator())
-                      : (isGridView
-                          ? GridView.builder(
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  crossAxisSpacing: 8.0,
-                                  mainAxisSpacing: 8.0,
-                                ),
-                            itemCount: filteredPokemonList.length,
-                            itemBuilder: (context, index) {
-                              final pokemon = filteredPokemonList[index];
-                              return GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) => PokemonDetailScreen(
-                                            pokemon: pokemon,
-                                            index: index + 1,
-                                          ),
-                                    ),
-                                  );
-                                },
-                                child: Card(
-                                  color: Colors.redAccent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15.0),
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Image.network(
-                                        pokemon.imageUrl,
-                                        height: 80,
-                                        width: 80,
-                                      ),
-                                      SizedBox(height: 8),
-                                      Text(
-                                        pokemon.name.toUpperCase(),
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 18,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: Icon(
-                                          pokemon.isFavorite
-                                              ? Icons.favorite
-                                              : Icons.favorite_border,
-                                          color: Colors.white,
-                                        ),
-                                        onPressed: () {
-                                          _toggleFavorite(pokemon);
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
+              filteredPokemonList.isEmpty
+                  ? Center(child: CircularProgressIndicator())
+                  : (isGridView
+                  ? GridView.builder(
+                gridDelegate:
+                SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 8.0,
+                  mainAxisSpacing: 8.0,
+                ),
+                itemCount: filteredPokemonList.length,
+                itemBuilder: (context, index) {
+                  final pokemon = filteredPokemonList[index];
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => PokemonDetailScreen(
+                            pokemon: pokemon,
+                            index: index + 1,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Card(
+                      color: Colors.redAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15.0),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.network(
+                            pokemon.imageUrl,
+                            height: 80,
+                            width: 80,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            pokemon.name.toUpperCase(),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              color: Colors.white,
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              pokemon.isFavorite
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              _toggleFavorite(pokemon);
                             },
-                          )
-                          : ListView.builder(
-                            itemCount: filteredPokemonList.length,
-                            itemBuilder: (context, index) {
-                              final pokemon = filteredPokemonList[index];
-                              return ListTile(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) => PokemonDetailScreen(
-                                            pokemon: pokemon,
-                                            index: index + 1,
-                                          ),
-                                    ),
-                                  );
-                                },
-                                leading: Image.network(
-                                  pokemon.imageUrl,
-                                  height: 50,
-                                  width: 50,
-                                ),
-                                title: Text(
-                                  pokemon.name.toUpperCase(),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                trailing: IconButton(
-                                  icon: Icon(
-                                    pokemon.isFavorite
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    color: Colors.red,
-                                  ),
-                                  onPressed: () {
-                                    _toggleFavorite(pokemon);
-                                  },
-                                ),
-                              );
-                            },
-                          )),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              )
+                  : ListView.builder(
+                itemCount: filteredPokemonList.length,
+                itemBuilder: (context, index) {
+                  final pokemon = filteredPokemonList[index];
+                  return ListTile(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => PokemonDetailScreen(
+                            pokemon: pokemon,
+                            index: index + 1,
+                          ),
+                        ),
+                      );
+                    },
+                    leading: Image.network(
+                      pokemon.imageUrl,
+                      height: 50,
+                      width: 50,
+                    ),
+                    title: Text(
+                      pokemon.name.toUpperCase(),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    trailing: IconButton(
+                      icon: Icon(
+                        pokemon.isFavorite
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: Colors.red,
+                      ),
+                      onPressed: () {
+                        _toggleFavorite(pokemon);
+                      },
+                    ),
+                  );
+                },
+              )),
             ),
           ],
         ),
