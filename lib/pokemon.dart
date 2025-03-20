@@ -9,8 +9,9 @@ class Pokemon {
   final int speed;
   final int weight;
   final int height;
-  final String type;
+  String type;
   bool isFavorite;
+  final int id;
 
   Pokemon({
     required this.name,
@@ -24,23 +25,24 @@ class Pokemon {
     required this.weight,
     required this.height,
     required this.type,
+    required this.id,
     this.isFavorite = false,
   });
 
   factory Pokemon.fromJson(Map<String, dynamic> json, int index) {
     return Pokemon(
       name: json['name'],
-      imageUrl:
-          json['sprites']['other']['official-artwork']['front_default'] ?? '',
-      hp: json['stats'][0]['base_stat'],
-      attack: json['stats'][1]['base_stat'],
-      defense: json['stats'][2]['base_stat'],
-      spAttack: json['stats'][3]['base_stat'],
-      spDefense: json['stats'][4]['base_stat'],
-      speed: json['stats'][5]['base_stat'],
-      weight: json['weight'],
-      height: json['height'],
+      imageUrl: json['sprites']['other']['official-artwork']['front_default'] ?? '',
+      hp: int.parse(json['stats'][0]['base_stat'].toString()), 
+      attack: int.parse(json['stats'][1]['base_stat'].toString()), 
+      defense: int.parse(json['stats'][2]['base_stat'].toString()), 
+      spAttack: int.parse(json['stats'][3]['base_stat'].toString()), 
+      spDefense: int.parse(json['stats'][4]['base_stat'].toString()), 
+      speed: int.parse(json['stats'][5]['base_stat'].toString()), 
+      weight: int.parse(json['weight'].toString()), 
+      height: int.parse(json['height'].toString()), 
       type: json['types'][0]['type']['name'],
+      id: index,
     );
   }
 }

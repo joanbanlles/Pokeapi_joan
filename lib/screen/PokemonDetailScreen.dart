@@ -7,7 +7,7 @@ class PokemonDetailScreen extends StatelessWidget {
 
   PokemonDetailScreen({required this.pokemon, required this.index});
 
-  /// Método para obtener el color según el tipo de Pokémon
+
   Color getTypeColor(String type) {
     switch (type.toLowerCase()) {
       case 'fire':
@@ -40,7 +40,7 @@ class PokemonDetailScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text("PokeDex"),
         backgroundColor: getTypeColor(pokemon.type),
-      ), // Cambiado el color del AppBar
+      ), 
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -48,7 +48,7 @@ class PokemonDetailScreen extends StatelessWidget {
             SizedBox(height: 20),
             Container(
               decoration: BoxDecoration(
-                color: getTypeColor(pokemon.type), // Cambiado el color de fondo
+                color: getTypeColor(pokemon.type), 
                 borderRadius: BorderRadius.only(
                   bottomLeft: Radius.circular(50),
                   bottomRight: Radius.circular(50),
@@ -96,7 +96,7 @@ class PokemonDetailScreen extends StatelessWidget {
     );
   }
 
-  /// Chip de tipo de Pokémon.
+
   Widget _buildTypeChip(String type) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 5),
@@ -107,7 +107,7 @@ class PokemonDetailScreen extends StatelessWidget {
     );
   }
 
-  /// Tarjeta con estadísticas del Pokémon.
+
   Widget _buildStats() {
     return Padding(
       padding: EdgeInsets.all(20),
@@ -134,7 +134,7 @@ class PokemonDetailScreen extends StatelessWidget {
   }
 
   Widget _buildStatRow(String label, int value, Color color) {
-    double maxWidth = 200; // Ancho máximo de la barra de progreso
+    double maxWidth = 200;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,7 +160,7 @@ class PokemonDetailScreen extends StatelessWidget {
             ),
             Container(
               height: 10,
-              width: (value / 270.0) * maxWidth, // Normalización
+              width: (value / 270.0) * maxWidth, 
               decoration: BoxDecoration(
                 color: color,
                 borderRadius: BorderRadius.circular(10),

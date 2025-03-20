@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:pokeapi/screen/PokemonListScreen.dart';
 
-// Instancia del plugin de notificaciones
+
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Asegura la inicialización correcta
+  WidgetsFlutterBinding.ensureInitialized(); 
 
-  // Configuración de notificaciones en Android
   const AndroidInitializationSettings androidInitSettings =
       AndroidInitializationSettings('@mipmap/ic_launcher');
 

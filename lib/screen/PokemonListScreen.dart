@@ -1,13 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'package:pokeapi/SP/favoritesmanager.dart';
-import 'package:pokeapi/main.dart';
 import 'package:pokeapi/pokemon.dart';
 import 'package:pokeapi/screen/PokemonDetailScreen.dart';
-
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class PokemonListScreen extends StatefulWidget {
   @override
@@ -22,127 +20,239 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
   bool isDarkMode = false;
   bool isGridView = true;
   bool isLoading = true;
+  String selectedType = "All";
+  String sortBy = "number";
+
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
+  final List<String> pokemonTypes = [
+    "All",
+    "fire",
+    "water",
+    "grass",
+    "electric",
+    "rock",
+    "ground",
+    "psychic",
+    "poison",
+    "bug",
+    "flying",
+    "ice",
+    "dragon",
+    "ghost",
+    "dark",
+    "steel",
+    "fairy"
+  ];
 
   @override
   void initState() {
     super.initState();
-
+    _loadTheme();
     searchController.addListener(_filterPokemon);
+    fetchPokemon();
+    _initializeNotifications();
   }
 
-  Future<void> _showFavoriteNotification(String pokemonName) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'favorite_pokemon_channel',
-          'Pokémon Favoritos',
-          channelDescription: 'Notifica cuando marcas un Pokémon como favorito',
-          importance: Importance.high,
-          priority: Priority.high,
-        );
+  Future<void> _initializeNotifications() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    const NotificationDetails notificationDetails = NotificationDetails(
-      android: androidDetails,
+    final InitializationSettings initializationSettings =
+        InitializationSettings(
+      android: initializationSettingsAndroid,
     );
 
-    await flutterLocalNotificationsPlugin.show(
-      0,
-      '¡Nuevo Favorito!',
-      '¡$pokemonName ahora es tu favorito!',
-      notificationDetails,
-    );
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
   }
 
-  Future<void> _loadFavorites() async {
-    final favorites = await FavoritesManager.getFavorites();
+  Future<void> _loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
     setState(() {
-      for (var pokemon in pokemonList) {
-        pokemon.isFavorite = favorites.contains(pokemon.name);
-      }
+      isDarkMode = prefs.getBool('isDarkMode') ?? false;
     });
   }
 
   Future<void> fetchPokemon() async {
-    print('Fetching Pokémon...');
-    final response = await http.get(
-      Uri.parse('https://pokeapi.co/api/v2/pokemon?limit=50'),
-    );
+    try {
+      final response = await http.get(
+        Uri.parse('https://pokeapi.co/api/v2/pokemon?limit=50'),
+      );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
 
-      List<Future<Pokemon>> futurePokemons =
-          data['results'].map<Future<Pokemon>>((item) async {
-            final pokemonResponse = await http.get(Uri.parse(item['url']));
-            if (pokemonResponse.statusCode == 200) {
-              final pokemonData = json.decode(pokemonResponse.body);
-              return Pokemon.fromJson(pokemonData, item['url']);
-            } else {
-              throw Exception('Failed to fetch ${item['name']}');
-            }
-          }).toList();
+        List<Future<Pokemon>> futurePokemons =
+            data['results'].map<Future<Pokemon>>((item) async {
+          final pokemonResponse = await http.get(Uri.parse(item['url']));
+          if (pokemonResponse.statusCode == 200) {
+            final pokemonData = json.decode(pokemonResponse.body);
+            Pokemon pokemon =
+                Pokemon.fromJson(pokemonData, pokemonList.length + 1);
+            pokemon.type = pokemonData['types'][0]['type']['name'];
+            pokemon.isFavorite = await FavoritesManager.isFavorite(pokemon.name);
+            return pokemon;
+          } else {
+            throw Exception('Failed to fetch ${item['name']}');
+          }
+        }).toList();
 
-      List<Pokemon> loadedPokemon = await Future.wait(futurePokemons);
+        List<Pokemon> loadedPokemon = await Future.wait(futurePokemons);
 
+        setState(() {
+          pokemonList = loadedPokemon;
+          filteredPokemonList = List.from(pokemonList);
+          _sortPokemon();
+          isLoading = false;
+        });
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } catch (e) {
       setState(() {
-        pokemonList = loadedPokemon;
-        filteredPokemonList = List.from(pokemonList);
         isLoading = false;
       });
-
-      print('Finished loading Pokémon.');
-    } else {
-      print('Failed to fetch Pokémon.');
     }
   }
 
-  void _toggleFavorite(Pokemon pokemon) async {
+  void _filterPokemon() {
     setState(() {
-      pokemon.isFavorite = !pokemon.isFavorite;
+      String query = searchController.text.toLowerCase();
+      filteredPokemonList = pokemonList.where((pokemon) {
+        bool matchesName = pokemon.name.toLowerCase().contains(query);
+        bool matchesType = selectedType == "All" || pokemon.type == selectedType;
+        return matchesName && matchesType;
+      }).toList();
+      _sortPokemon();
+    });
+  }
+
+  void _filterByType(String type) {
+    setState(() {
+      selectedType = type;
+      _filterPokemon();
+    });
+  }
+
+  void _sortPokemon() {
+    setState(() {
+      if (sortBy == "name") {
+        filteredPokemonList.sort((a, b) => a.name.compareTo(b.name));
+      } else {
+        filteredPokemonList.sort((a, b) => a.id.compareTo(b.id));
+      }
+    });
+  }
+
+  void _changeSortBy(String newSortBy) {
+    setState(() {
+      sortBy = newSortBy;
+      _sortPokemon();
+    });
+  }
+
+  Future<void> _showNotification(String message) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'favorite_pokemon_channel',
+      'Favoritos',
+      channelDescription: 'Notificación al agregar un Pokémon a favoritos',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+
+    const NotificationDetails platformDetails =
+        NotificationDetails(android: androidDetails);
+
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      'Pokédex',
+      message,
+      platformDetails,
+    );
+  }
+
+  void _toggleFavorite(Pokemon pokemon) async {
+    bool isFav = await FavoritesManager.isFavorite(pokemon.name);
+
+    setState(() {
+      pokemon.isFavorite = !isFav;
     });
 
     if (pokemon.isFavorite) {
       await FavoritesManager.addFavorite(pokemon.name);
-      Future.delayed(Duration(seconds: 3), () {
-        _showFavoriteNotification(pokemon.name);
-      });
+      _showNotification("Has dado Me Gusta a ${pokemon.name}!");
     } else {
       await FavoritesManager.removeFavorite(pokemon.name);
+      _showNotification("Has eliminado a ${pokemon.name} de favoritos.");
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Pokedex'),
-        actions: [
-          IconButton(
-            icon: Icon(isGridView ? Icons.list : Icons.grid_view),
-            onPressed: () {
-              setState(() {
-                isGridView = !isGridView;
-              });
-            },
-          ),
-          IconButton(
-            icon: Icon(isSearchOpen ? Icons.close : Icons.search),
-            onPressed: () {
-              setState(() {
-                isSearchOpen = !isSearchOpen;
-              });
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          AnimatedContainer(
-            duration: Duration(milliseconds: 300),
-            height: isSearchOpen ? 60 : 0,
-            padding: EdgeInsets.symmetric(horizontal: 10),
-            child:
-                isSearchOpen
-                    ? TextField(
+    return MaterialApp(
+      
+      debugShowCheckedModeBanner: false,
+      theme: isDarkMode ? ThemeData.dark() : ThemeData.light(),
+      home: Scaffold(
+        appBar: AppBar(
+          backgroundColor: const Color.fromARGB(255, 213, 221, 176).withOpacity(0.7),
+          title: Text('Pokedex'),
+          actions: [
+            IconButton(
+              icon: Icon(isGridView ? Icons.list : Icons.grid_view),
+              onPressed: () {
+                setState(() {
+                  isGridView = !isGridView;
+                });
+              },
+            ),
+            IconButton(
+              icon: Icon(isDarkMode ? Icons.light_mode : Icons.dark_mode),
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                setState(() {
+                  isDarkMode = !isDarkMode;
+                  prefs.setBool('isDarkMode', isDarkMode);
+                });
+              },
+            ),
+            IconButton(
+              icon: Icon(isSearchOpen ? Icons.close : Icons.search),
+              onPressed: () {
+                setState(() {
+                  isSearchOpen = !isSearchOpen;
+                });
+              },
+            ),
+            PopupMenuButton<String>(
+              onSelected: _changeSortBy,
+              itemBuilder: (BuildContext context) {
+                return [
+                  PopupMenuItem(
+                    value: "number",
+                    child: Text("Ordenar por número"),
+                  ),
+                  PopupMenuItem(
+                    value: "name",
+                    child: Text("Ordenar por nombre"),
+                  ),
+                ];
+              },
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            AnimatedContainer(
+              duration: Duration(milliseconds: 300),
+              height: isSearchOpen ? 60 : 0,
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: isSearchOpen
+                  ? TextField(
                       controller: searchController,
                       decoration: InputDecoration(
                         hintText: 'Buscar Pokémon...',
@@ -151,21 +261,44 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
                         ),
                         prefixIcon: Icon(Icons.search),
                       ),
-                      onChanged:
-                          (value) =>
-                              _filterPokemon(), // 🔥 Asegurar que se llama
+                      onChanged: (value) => _filterPokemon(),
                     )
-                    : SizedBox(),
-          ),
-          Expanded(
-            child:
-                isLoading
-                    ? Center(child: CircularProgressIndicator())
-                    : isGridView
-                    ? _buildGridView()
-                    : _buildListView(),
-          ),
-        ],
+                  : SizedBox(),
+            ),
+            Container(
+              height: 50,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: pokemonTypes.length,
+                itemBuilder: (context, index) {
+                  String type = pokemonTypes[index];
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    child: ChoiceChip(
+                      label: Text(
+                        type.toUpperCase(),
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      selected: selectedType == type,
+                      onSelected: (bool selected) {
+                        _filterByType(type);
+                      },
+                      selectedColor: Colors.blue,
+                      backgroundColor: Colors.white,
+                    ),
+                  );
+                },
+              ),
+            ),
+            Expanded(
+              child: isLoading
+                  ? Center(child: CircularProgressIndicator())
+                  : isGridView
+                      ? _buildGridView()
+                      : _buildListView(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -180,8 +313,7 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
       ),
       itemCount: filteredPokemonList.length,
       itemBuilder: (context, index) {
-        final pokemon = filteredPokemonList[index];
-        return _buildPokemonCard(pokemon);
+        return _buildPokemonCard(filteredPokemonList[index]);
       },
     );
   }
@@ -190,8 +322,7 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
     return ListView.builder(
       itemCount: filteredPokemonList.length,
       itemBuilder: (context, index) {
-        final pokemon = filteredPokemonList[index];
-        return _buildPokemonCard(pokemon);
+        return _buildPokemonCard(filteredPokemonList[index]);
       },
     );
   }
@@ -202,57 +333,30 @@ class _PokemonListScreenState extends State<PokemonListScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder:
-                (context) => PokemonDetailScreen(
-                  pokemon: pokemon,
-                  index: pokemonList.indexOf(pokemon) + 1,
-                ),
+            builder: (context) => PokemonDetailScreen(
+              pokemon: pokemon,
+              index: filteredPokemonList.indexOf(pokemon) + 1,
+            ),
           ),
         );
       },
       child: Card(
-        elevation: 5,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Image.network(
-              pokemon.imageUrl,
-              height: 100,
-              width: 100,
-              fit: BoxFit.cover,
-            ),
-            Text(
-              pokemon.name.toUpperCase(),
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
+            Image.network(pokemon.imageUrl, height: 100, width: 100),
+            Text(pokemon.name.toUpperCase()),
             IconButton(
               icon: Icon(
                 pokemon.isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: Colors.red,
+                color: pokemon.isFavorite ? Colors.red : null,
               ),
-              onPressed: () => _toggleFavorite(pokemon),
+              onPressed: () {
+                _toggleFavorite(pokemon);
+              },
             ),
           ],
         ),
       ),
     );
-  }
-
-  void _filterPokemon() {
-    setState(() {
-      String query = searchController.text.toLowerCase();
-      filteredPokemonList =
-          pokemonList.where((pokemon) {
-            return pokemon.name.toLowerCase().contains(query);
-          }).toList();
-    });
-  }
-
-  @override
-  void dispose() {
-    searchController.removeListener(_filterPokemon);
-    searchController.dispose();
-    super.dispose();
   }
 }
